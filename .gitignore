@@ -1,5 +1,5 @@
 __pycache__/
 *.pyc
-*.log
+*log*
 *.out
-.DS_Store/
+.DS_Store
