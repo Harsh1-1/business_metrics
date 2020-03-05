@@ -1,0 +1,14 @@
+version: "2"
+
+services:
+  web2:
+    image: bm2
+    ports:
+      - 7000:7000
+
+  prometehus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - /Users/mani.g/Documents/business_metrics/prometheus.yml:/etc/prometheus/prometheus.yml
