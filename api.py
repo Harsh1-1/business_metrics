@@ -1,26 +1,35 @@
-from utility_class import utility
+"""
+Author : Mani Garg
+Updated By: Harsh Suryavanshi
+"""
+
+#All Imports 
+from utility_class import Utility
 from prometheus_class import prometheus
 import requests
-from logging_class import logg
+from logging_class import Logg
 import prometheus_client as prom
 import time
 import json
-import flask
+from flask import Flask, jsonify, redirect, url_for, g
 from werkzeug.serving import run_simple
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from prometheus_client import make_wsgi_app
 from flask_prometheus_metrics import register_metrics
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
+from error_handler import InvalidUsage
 
-app = flask.Flask(__name__)
+app = Flask(__name__)
 app.config["DEBUG"] = True
 app.config['checker']=True
-#@app.before_first_request
+
+@app.before_first_request
 def getting_urls():
     gauge_obj_list=[]
     # url_list=[]
-    url_data= utility.get_ymlfile()
+    utility = Utility()
+    url_data= utility.get_ymldata()
     if url_data=="Invalid json":
         app.config['checker']=False
         # return flask.redirect(flask.url_for("on_Invalid"))
@@ -31,7 +40,7 @@ def getting_urls():
             # output= initialising(url)
             # if type(output) is list:
             print(gauge_obj_list)
-            gauge_obj_list+= initialising(url)
+            gauge_obj_list+= initialising(url+path)
             # else:
             #     print(flask.url_for(".on_Invalid"))
             app.config["gauge_list"]= gauge_obj_list
@@ -43,7 +52,7 @@ def getting_urls():
             app.config["urls_list"]= url_list
 
 def initialising(url):
-    logg.make_logfile();
+    Logg.make_logfile()
     data={}
     # gauge_obj_list1=[]
     try:
@@ -59,13 +68,13 @@ def initialising(url):
             # else:
         return gauge_obj_list1
     except Exception as excp:
-        logg.write_into_file(excp)
+        Logg.write_into_file(excp)
 
 
 
 def after_some_time():
     if app.config['checker']==False:
-        return flask.redirect(flask.url_for("on_Invalid"))
+        return redirect(url_for("on_Invalid"))
     else:
         for i in app.config['urls_list']:
             try:
@@ -73,19 +82,19 @@ def after_some_time():
                 # if len(app.config[gauge_list])==0:
                 #      print(flask.url_for(".on_Invalid"))
                 # else:
-                data=json.loads(requests.get(i).text)
+                data=json.loads(requests.get(i+"/metrics").text)
                 # print(app.config['gauge_list'])
                 prometheus.set_gauge_obj(data, app.config['gauge_list'] )
                 # print(app.config['gauge_'])
                 #print(app.config['gauge_list'])
             except Exception as excp:
-                logg.write_into_file(excp)
+                Logg.write_into_file(excp)
 @app.route('/')
 def home():
     # getting_urls()
     # list_arg=[app.config["urls_list"] , app.config["gauge_list"]]
     if app.config['checker']==False:
-        return flask.redirect(flask.url_for("on_Invalid"))
+        return redirect(url_for("on_Invalid"))
     else:
         scheduler = BackgroundScheduler()
         scheduler.add_job(func=after_some_time, trigger="interval", seconds=3)
@@ -101,6 +110,10 @@ def registering_metrics():
     # print(app.config['gauge_list'])
     getting_urls()
     return("ayya")
-@app.route('/error')
-def on_Invalid():
-    return("Invalid Json")
+
+#For handling api errors
+@app.errorhandler(InvalidUsage)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
